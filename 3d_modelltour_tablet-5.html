@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<title>3D Modelltour – Tablet Version</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; touch-action: none; }
+  #info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    z-index: 10;
+  }
+  #joystick {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 120px;
+    height: 120px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    touch-action: none;
+  }
+  #stick {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 50%;
+    top: 35px;
+    left: 35px;
+  }
+</style>
+</head>
+<body>
+<div id="info">
+<b>3D Modelltour (Tablet)</b><br>
+Linker Kreis = bewegen<br>
+Wischen = umsehen
+</div>
+
+<div id="joystick"><div id="stick"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdedede);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 5, 20);
+
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Licht
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10, 20, 10);
+scene.add(light);
+
+// Boden
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({color: 0xf2f2f2})
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+// Räume
+function room(x, z, w, d, h, color) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({color, transparent:true, opacity:0.9})
+  );
+  mesh.position.set(x, h/2, z);
+  scene.add(mesh);
+}
+
+room(0, 0, 12, 12, 6, 0xcccccc);      // Foyer
+room(-20, 0, 16, 12, 6, 0xffe0b2);    // Synagoge
+room(20, -15, 16, 12, 8, 0xe1bee7);   // Kirche
+room(20, 15, 16, 12, 6, 0xc8e6c9);    // Moschee
+
+const minaret = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.5, 1.5, 20, 16),
+  new THREE.MeshStandardMaterial({color: 0xb0bec5})
+);
+minaret.position.set(30, 10, 15);
+scene.add(minaret);
+
+// Touch-Steuerung
+let moveX = 0, moveZ = 0;
+const joystick = document.getElementById("joystick");
+const stick = document.getElementById("stick");
+const center = {x: 60, y: 60};
+
+joystick.addEventListener("touchmove", e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = joystick.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  const dx = x - center.x;
+  const dy = y - center.y;
+  const dist = Math.min(40, Math.hypot(dx, dy));
+  const angle = Math.atan2(dy, dx);
+  stick.style.left = center.x + Math.cos(angle)*dist - 25 + "px";
+  stick.style.top = center.y + Math.sin(angle)*dist - 25 + "px";
+  moveX = Math.cos(angle) * dist * 0.01;
+  moveZ = Math.sin(angle) * dist * 0.01;
+});
+
+joystick.addEventListener("touchend", () => {
+  stick.style.left = "35px";
+  stick.style.top = "35px";
+  moveX = moveZ = 0;
+});
+
+let lastTouch;
+document.addEventListener("touchmove", e => {
+  if (!lastTouch) { lastTouch = e.touches[0]; return; }
+  const dx = e.touches[0].clientX - lastTouch.clientX;
+  camera.rotation.y -= dx * 0.005;
+  lastTouch = e.touches[0];
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  camera.position.x += moveX;
+  camera.position.z += moveZ;
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
