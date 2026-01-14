@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<title>Realistische 3D Modelltour – Material & Touch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+body { margin:0; overflow:hidden; font-family:Arial, sans-serif; background:#000; }
+#ui {
+  position:absolute; top:12px; left:12px;
+  background:rgba(0,0,0,0.6); color:#fff;
+  padding:12px 16px; border-radius:12px; font-size:14px; z-index:10;
+}
+.label {
+  position:absolute;
+  color:white;
+  background:rgba(0,0,0,0.6);
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:13px;
+  pointer-events:none;
+}
+#joystick {
+  position:absolute; bottom:20px; left:20px;
+  width:120px; height:120px;
+  background:rgba(0,0,0,0.25);
+  border-radius:50%;
+}
+#stick {
+  position:absolute; width:50px; height:50px;
+  background:rgba(255,255,255,0.8);
+  border-radius:50%;
+  top:35px; left:35px;
+}
+</style>
+</head>
+<body>
+<div id="ui">
+<b>3D Modelltour – realistisch</b><br>
+Joystick = bewegen<br>
+Wischen = umsehen
+</div>
+<div id="joystick"><div id="stick"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfd1e5);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,1.7,18);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
+document.body.appendChild(renderer.domElement);
+
+// Licht
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,0.6));
+const sun = new THREE.DirectionalLight(0xffffff,2.5);
+sun.position.set(40,60,20);
+scene.add(sun);
+
+// Materialien
+const stone = new THREE.MeshStandardMaterial({color:0xcfcfcf, roughness:0.85});
+const concrete = new THREE.MeshStandardMaterial({color:0xdadada, roughness:0.9});
+const glass = new THREE.MeshPhysicalMaterial({
+  color:0xffffff, roughness:0,
+  transmission:1, thickness:0.6
+});
+
+// Boden
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(300,300),
+  new THREE.MeshStandardMaterial({color:0xe8e8e8, roughness:1})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+// Gebäude
+function building(x,z,w,d,h,mat){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,h/2,z);
+  scene.add(m);
+  return m;
+}
+
+const foyer = building(0,0,14,14,7,glass);
+const synagoge = building(-26,0,20,14,7,stone);
+const kirche = building(26,-20,20,14,11,stone);
+const moschee = building(26,20,20,14,7,stone);
+
+// Minarett
+const minaret = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.8,2.2,28,32),
+  concrete
+);
+minaret.position.set(40,14,20);
+scene.add(minaret);
+
+// Labels
+function makeLabel(text){
+  const div=document.createElement("div");
+  div.className="label";
+  div.innerText=text;
+  document.body.appendChild(div);
+  return div;
+}
+
+const labels=[
+  {obj:foyer, el:makeLabel("Gemeinsames Foyer (Glas)")},
+  {obj:synagoge, el:makeLabel("Synagoge (Stein)")},
+  {obj:kirche, el:makeLabel("Kirche (Stein, höher)")},
+  {obj:moschee, el:makeLabel("Moschee (Stein)")},
+  {obj:minaret, el:makeLabel("Minarett (Beton)")}
+];
+
+// Touch-Steuerung
+let moveX=0, moveZ=0;
+const joystick=document.getElementById("joystick");
+const stick=document.getElementById("stick");
+const center={x:60,y:60};
+
+joystick.addEventListener("touchmove",e=>{
+  const t=e.touches[0];
+  const r=joystick.getBoundingClientRect();
+  const dx=t.clientX-r.left-center.x;
+  const dy=t.clientY-r.top-center.y;
+  const dist=Math.min(40,Math.hypot(dx,dy));
+  const a=Math.atan2(dy,dx);
+  stick.style.left=center.x+Math.cos(a)*dist-25+"px";
+  stick.style.top=center.y+Math.sin(a)*dist-25+"px";
+  moveX=Math.cos(a)*dist*0.02;
+  moveZ=Math.sin(a)*dist*0.02;
+});
+
+joystick.addEventListener("touchend",()=>{
+  stick.style.left="35px";
+  stick.style.top="35px";
+  moveX=moveZ=0;
+});
+
+let lastTouch=null;
+document.addEventListener("touchmove",e=>{
+  if(!lastTouch){ lastTouch=e.touches[0]; return; }
+  const dx=e.touches[0].clientX-lastTouch.clientX;
+  camera.rotation.y -= dx*0.004;
+  lastTouch=e.touches[0];
+});
+
+// Render Loop
+function animate(){
+  requestAnimationFrame(animate);
+  camera.position.x += moveX;
+  camera.position.z += moveZ;
+
+  labels.forEach(l=>{
+    const p=l.obj.position.clone();
+    p.project(camera);
+    l.el.style.left=(p.x*0.5+0.5)*window.innerWidth+"px";
+    l.el.style.top=(-p.y*0.5+0.5)*window.innerHeight+"px";
+  });
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
