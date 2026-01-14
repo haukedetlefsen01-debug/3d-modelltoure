@@ -1,0 +1,140 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<title>Realistische 3D Modelltour – Interreligiöses Haus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background:#000; }
+  #ui {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+<b>Realistische 3D-Modelltour</b><br>
+Wischen = umsehen<br>
+Joystick links = bewegen
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfd1e5);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 1.7, 15);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.physicallyCorrectLights = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
+
+const sun = new THREE.DirectionalLight(0xffffff, 3);
+sun.position.set(30, 60, 20);
+scene.add(sun);
+
+const concrete = new THREE.MeshStandardMaterial({color:0xd6d6d6, roughness:0.8});
+const glass = new THREE.MeshPhysicalMaterial({color:0xffffff, roughness:0, transmission:1, thickness:0.5});
+const stone = new THREE.MeshStandardMaterial({color:0xcfcfcf, roughness:0.9});
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(300,300),
+  new THREE.MeshStandardMaterial({color:0xe5e5e5, roughness:1})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+function building(x,z,w,d,h,mat){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,h/2,z);
+  scene.add(m);
+}
+
+building(0,0,14,14,7,glass);
+building(-25,0,20,14,7,stone);
+building(25,-20,20,14,10,stone);
+building(25,20,20,14,7,stone);
+
+const minaret = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.8,2.2,28,32),
+  stone
+);
+minaret.position.set(40,14,20);
+scene.add(minaret);
+
+let moveX=0, moveZ=0;
+let lastTouch=null;
+
+document.addEventListener("touchmove", e=>{
+  if(!lastTouch){ lastTouch=e.touches[0]; return; }
+  const dx=e.touches[0].clientX-lastTouch.clientX;
+  camera.rotation.y -= dx*0.004;
+  lastTouch=e.touches[0];
+});
+
+const joy=document.createElement("div");
+joy.style.position="absolute";
+joy.style.bottom="20px";
+joy.style.left="20px";
+joy.style.width="120px";
+joy.style.height="120px";
+joy.style.borderRadius="50%";
+joy.style.background="rgba(0,0,0,0.25)";
+document.body.appendChild(joy);
+
+const stick=document.createElement("div");
+stick.style.width="50px";
+stick.style.height="50px";
+stick.style.borderRadius="50%";
+stick.style.background="rgba(255,255,255,0.8)";
+stick.style.position="absolute";
+stick.style.left="35px";
+stick.style.top="35px";
+joy.appendChild(stick);
+
+const center={x:60,y:60};
+joy.addEventListener("touchmove", e=>{
+  const t=e.touches[0];
+  const r=joy.getBoundingClientRect();
+  const x=t.clientX-r.left-center.x;
+  const y=t.clientY-r.top-center.y;
+  const dist=Math.min(40,Math.hypot(x,y));
+  const a=Math.atan2(y,x);
+  stick.style.left=center.x+Math.cos(a)*dist-25+"px";
+  stick.style.top=center.y+Math.sin(a)*dist-25+"px";
+  moveX=Math.cos(a)*dist*0.02;
+  moveZ=Math.sin(a)*dist*0.02;
+});
+joy.addEventListener("touchend",()=>{
+  stick.style.left="35px";
+  stick.style.top="35px";
+  moveX=moveZ=0;
+});
+
+function animate(){
+  requestAnimationFrame(animate);
+  camera.position.x += moveX;
+  camera.position.z += moveZ;
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
